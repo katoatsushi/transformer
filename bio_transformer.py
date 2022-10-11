@@ -26,7 +26,7 @@ vocab_transform = {}
 def get_tokenizer_of_amino_acid(data):
     # return list(data)
     return data.split(' ')
-
+    
 def get_tokenizer_of_structure(data):
     return data.split(' ')
 
