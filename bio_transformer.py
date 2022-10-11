@@ -7,7 +7,6 @@ import tqdm
 SRC_LANGUAGE = 'amino'
 TGT_LANGUAGE = 'structure'
 
-# data.csvはギャップ情報を取り除き、アミノ酸配列長と二次構造情報配列長が同じもののみを集めたもの
 path = './DATA/data.csv'
 import csv
 f = open(path,'r',encoding="utf-8")
@@ -37,7 +36,7 @@ token_transform[TGT_LANGUAGE] = get_tokenizer_of_structure
 def yield_tokens(data_iter: Iterable, language: str) -> List[str]:
     language_index = {SRC_LANGUAGE: 0, TGT_LANGUAGE: 1}
     """
-        例: 
+        ex: 
         data_iter: ["ALOIDPIPAJPIAJA","HHHHHHHSSSSSSSSS"]
         language: SRC_LANGUAGE
     """
@@ -169,7 +168,6 @@ NHEAD = 8
 # FFN_HID_DIM = 512
 FFN_HID_DIM = 512
 # BATCH_SIZE = 128
-# タンパク質によって長さが全然違うから、BATCH_SIZEは細かく区切った方が良い？
 BATCH_SIZE = 128
 NUM_ENCODER_LAYERS = 3
 NUM_DECODER_LAYERS = 3
@@ -230,20 +228,10 @@ from torch.utils.data import DataLoader
 def train_epoch(model, optimizer):
     model.train()
     losses = 0
-    # 質問項目
     train_dataloader = DataLoader(TRAIN_DATA, batch_size=BATCH_SIZE, collate_fn=collate_fn)
     for src, tgt in tqdm.tqdm(train_dataloader):
         # torch.Size([250, 16])
         # src: torch.Size([250, 16])  len:  250
-        """
-            src: torch.Size([250, 16])
-            tgt: torch.Size([250, 16])
-            とか、
-            src: torch.Size([100, 16])
-            tgt: torch.Size([100, 16])
-            くらいまでには落としたい
-        """
-
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
 
@@ -337,7 +325,6 @@ test = "T R V K L N Y L D Q I A K F W E I Q G S S L K I P N V E R R I L D L Y S 
 print(translate(transformer, test))
 
 TEST_RESULT = './DATA/logs.csv'
-# csvモジュールを使って1行の内容をCSVファイルに書き込み
 result = []
 for test in TEST_DATA:
     input_data = test[0]
