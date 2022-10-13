@@ -13,7 +13,7 @@ f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
 
-TRAIN_DATA = train_rowsTRAIN_DATA = train_rows[:10000]
+TRAIN_DATA = train_rows[:10000]
 TEST_DATA = train_rows[10000:]
 
 # TRAIN_DATA = train_rowsTRAIN_DATA = train_rows[:1000]
