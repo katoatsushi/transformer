@@ -3,7 +3,7 @@ import random
 
 AMINOS = [ "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y" ]
 STRUCTURE = [ "HB", "HE", "SB", "SE", "#B", "#E" ]
-DATA_NUM = 1000
+DATA_NUM = 10000
 
 CSV_PATH = './test_data.csv'
 
