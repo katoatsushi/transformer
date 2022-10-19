@@ -3,51 +3,52 @@ from torchtext.vocab import build_vocab_from_iterator
 from typing import Iterable, List
 import csv
 import tqdm
+from torch import Tensor
+import torch
+import torch.nn as nn
+from torch.nn import Transformer
+import math
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import DataLoader
+from timeit import default_timer as timer
 
 SRC_LANGUAGE = 'amino'
 TGT_LANGUAGE = 'structure'
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-path = './DATA/data.csv'
-import csv
+# サンプル
+path = './DATA/sample.csv'
+# path = './DATA/onestr_data.csv'
+
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
 
-TRAIN_DATA = train_rows[:10000]
-TEST_DATA = train_rows[10000:]
-
-# TRAIN_DATA = train_rowsTRAIN_DATA = train_rows[:1000]
-# TEST_DATA = train_rows[1000:1300]
-
+#TRAIN_DATA = train_rows[:10000]
+#TEST_DATA = train_rows[10000:]
+TRAIN_DATA = train_rows[:1]
+TEST_DATA = train_rows[:1]
 # Place-holders
 token_transform = {}
 vocab_transform = {}
 
-def get_tokenizer_of_amino_acid(data):
-    # return list(data)
-    return data.split(' ')
-    
-def get_tokenizer_of_structure(data):
+def get_tokenizer_of_residue(data):
     return data.split(' ')
 
-token_transform[SRC_LANGUAGE] = get_tokenizer_of_amino_acid
-token_transform[TGT_LANGUAGE] = get_tokenizer_of_structure
+token_transform[SRC_LANGUAGE] = get_tokenizer_of_residue
+token_transform[TGT_LANGUAGE] = get_tokenizer_of_residue
 
 def yield_tokens(data_iter: Iterable, language: str) -> List[str]:
     language_index = {SRC_LANGUAGE: 0, TGT_LANGUAGE: 1}
-    """
-        ex: 
-        data_iter: ["ALOIDPIPAJPIAJA","HHHHHHHSSSSSSSSS"]
-        language: SRC_LANGUAGE
-    """
     for data_sample in data_iter:
         yield token_transform[language](data_sample[language_index[language]])
 
+# UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+#special_symbols = ['<unk>', '<pad>', '<bos>', '<eos>']
 # Define special symbols and indices
-UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+C_TER_IDX, E_TER_IDX, START_IDX, FINISH_IDX = 0, 1, 2, 3
 # Make sure the tokens are in order of their indices to properly insert them in vocab
-special_symbols = ['<unk>', '<pad>', '<bos>', '<eos>']
-
+special_symbols = ['<c_terminal>', '<e_terminal>', '<start>', '<finish>']
 for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
     # Create torchtext's Vocab object
     vocab_transform[ln] = build_vocab_from_iterator(yield_tokens(TRAIN_DATA, ln),
@@ -55,20 +56,13 @@ for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
                                                     specials=special_symbols,
                                                     special_first=True)
 
-# Set UNK_IDX as the default index. This index is returned when the token is not found.
+# Set C_TER_IDX as the default index. This index is returned when the token is not found.
 # If not set, it throws RuntimeError when the queried token is not found in the Vocabulary.
 for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
-  vocab_transform[ln].set_default_index(UNK_IDX)
+  vocab_transform[ln].set_default_index(C_TER_IDX)
 
 print(vocab_transform[SRC_LANGUAGE].get_stoi())
 print(vocab_transform[TGT_LANGUAGE].get_stoi())
-
-from torch import Tensor
-import torch
-import torch.nn as nn
-from torch.nn import Transformer
-import math
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # helper Module that adds positional encoding to the token embedding to introduce a notion of word order.
 class PositionalEncoding(nn.Module):
@@ -142,6 +136,15 @@ class Seq2SeqTransformer(nn.Module):
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         return self.transformer.decoder(self.positional_encoding( self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
+# 出現度の逆数をとったLoss関数
+class MAELoss(nn.Module):
+    def __init__(self): 
+        super(MAELoss, self).__init__()
+
+    def forward(self, outputs, targets):
+        loss = torch.mean(torch.abs(outputs - targets))
+        return loss
+
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones((sz, sz), device=DEVICE)) == 1).transpose(0, 1)
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
@@ -154,28 +157,29 @@ def create_mask(src, tgt):
     tgt_mask = generate_square_subsequent_mask(tgt_seq_len)
     src_mask = torch.zeros((src_seq_len, src_seq_len),device=DEVICE).type(torch.bool)
 
-    src_padding_mask = (src == PAD_IDX).transpose(0, 1)
-    tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
+    src_padding_mask = (src == E_TER_IDX).transpose(0, 1)
+    tgt_padding_mask = (tgt == E_TER_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
 torch.manual_seed(0)
 
 SRC_VOCAB_SIZE = len(vocab_transform[SRC_LANGUAGE])
 TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
-EMB_SIZE = 512
-# EMB_SIZE = 16
-NHEAD = 8
+EMB_SIZE = 32
+NHEAD = 4
+FFN_HID_DIM = 16
+BATCH_SIZE = 1
+NUM_ENCODER_LAYERS = 4
+NUM_DECODER_LAYERS = 4
+
+# EMB_SIZE = 512
+# NHEAD = 8
 # FFN_HID_DIM = 512
-FFN_HID_DIM = 512
 # BATCH_SIZE = 128
-BATCH_SIZE = 128
-NUM_ENCODER_LAYERS = 3
-NUM_DECODER_LAYERS = 3
+# NUM_ENCODER_LAYERS = 3
+# NUM_DECODER_LAYERS = 3
 
-transformer = Seq2SeqTransformer(NUM_ENCODER_LAYERS, NUM_DECODER_LAYERS, EMB_SIZE,
-                                 NHEAD, SRC_VOCAB_SIZE, TGT_VOCAB_SIZE, FFN_HID_DIM)
-
-print(type(transformer))
+transformer = Seq2SeqTransformer(NUM_ENCODER_LAYERS, NUM_DECODER_LAYERS, EMB_SIZE, NHEAD, SRC_VOCAB_SIZE, TGT_VOCAB_SIZE, FFN_HID_DIM)
 
 for p in transformer.parameters():
     if p.dim() > 1:
@@ -183,11 +187,9 @@ for p in transformer.parameters():
 
 transformer = transformer.to(DEVICE)
 
-loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+loss_fn = torch.nn.CrossEntropyLoss(ignore_index=E_TER_IDX)
 
 optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
-
-from torch.nn.utils.rnn import pad_sequence
 
 # helper function to club together sequential operations
 def sequential_transforms(*transforms):
@@ -197,20 +199,18 @@ def sequential_transforms(*transforms):
         return txt_input
     return func
 
-# function to add BOS/EOS and create tensor for input sequence indices
+# function to add start/finish and create tensor for input sequence indices
 def tensor_transform(token_ids: List[int]):
-    return torch.cat((torch.tensor([BOS_IDX]),
+    return torch.cat((torch.tensor([START_IDX]),
                       torch.tensor(token_ids),
-                      torch.tensor([EOS_IDX])))
+                      torch.tensor([FINISH_IDX])))
 
 # src and tgt language text transforms to convert raw strings into tensors indices
 text_transform = {}
 for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
     text_transform[ln] = sequential_transforms(token_transform[ln], #Tokenization
                                                vocab_transform[ln], #Numericalization
-                                               tensor_transform) # Add BOS/EOS and create tensor
-
-print(type(text_transform[SRC_LANGUAGE]))
+                                               tensor_transform) # Add start/finish and create tensor
 
 # function to collate data samples into batch tesors
 def collate_fn(batch):
@@ -219,36 +219,76 @@ def collate_fn(batch):
         src_batch.append(text_transform[SRC_LANGUAGE](src_sample.rstrip("\n")))
         tgt_batch.append(text_transform[TGT_LANGUAGE](tgt_sample.rstrip("\n")))
 
-    src_batch = pad_sequence(src_batch, padding_value=PAD_IDX)
-    tgt_batch = pad_sequence(tgt_batch, padding_value=PAD_IDX)
+    src_batch = pad_sequence(src_batch, padding_value=E_TER_IDX)
+    tgt_batch = pad_sequence(tgt_batch, padding_value=E_TER_IDX)
     return src_batch, tgt_batch
-
-from torch.utils.data import DataLoader
 
 def train_epoch(model, optimizer):
     model.train()
     losses = 0
+
+    """
+    train_dataloaderの中身は、入力の文字列をindexに直した配列
+    インデックスが {"H": 4, "S": 5} の時
+    HHSSSは [[4],[4],[5],[5],[5]]とあわらされる
+    """
     train_dataloader = DataLoader(TRAIN_DATA, batch_size=BATCH_SIZE, collate_fn=collate_fn)
+
     for src, tgt in tqdm.tqdm(train_dataloader):
-        # torch.Size([250, 16])
-        # src: torch.Size([250, 16])  len:  250
+        """
+        srcは入力配列の単語数の長さの配列
+        tagは出力配列の単語数の長さの配列
+        """
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
-
+        """
+        出力配列の一番最後を取り除いた新しい配列を作成
+        [A,B,C,D] => [A,B,C]
+        """
         tgt_input = tgt[:-1, :]
 
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-        logits = model(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+        logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+        print("src:", src.shape)
+        print("tgt_input:", tgt_input.shape)
+        print("src_mask:", src_mask.shape)
+        print("tgt_mask:", tgt_mask.shape)
+        print("src_padding_mask:", src_padding_mask.shape)
+        print("tgt_padding_mask:", tgt_padding_mask.shape)
 
+        print("logits:", logits.shape)
         optimizer.zero_grad()
 
+        """
+        出力配列の一番最後を取り除いた新しい配列を作成
+        [A,B,C,D] => [B,C,D]
+        """
         tgt_out = tgt[1:, :]
+        print(logits.reshape(-1, logits.shape[-1]).shape)
+        print(logits.reshape(-1, logits.shape[-1]))
+        print(tgt_out.reshape(-1).shape)
+        print(tgt_out.reshape(-1))
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        print(type(loss))
+        insert_loss = torch.tensor([
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0],
+            [0, 0, 2, 0, 0, 0]
+        ])
+        loss = insert_loss
         loss.backward()
-
         optimizer.step()
         losses += loss.item()
+        print("lossesの最終値は:", losses)
 
     return losses / len(train_dataloader)
 
@@ -276,18 +316,6 @@ def evaluate(model):
 
     return losses / len(val_dataloader)
 
-from timeit import default_timer as timer
-# NUM_EPOCHS = 18
-NUM_EPOCHS = 10
-print("fit start...")
-for epoch in range(1, NUM_EPOCHS+1):
-    start_time = timer()
-    train_loss = train_epoch(transformer, optimizer)
-    end_time = timer()
-    val_loss = evaluate(transformer)
-    print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
-
-
 # function to generate output sequence using greedy algorithm
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     src = src.to(DEVICE)
@@ -297,17 +325,15 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
     ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(DEVICE)
     for i in range(max_len-1):
         memory = memory.to(DEVICE)
-        tgt_mask = (generate_square_subsequent_mask(ys.size(0))
-                    .type(torch.bool)).to(DEVICE)
+        tgt_mask = (generate_square_subsequent_mask(ys.size(0)).type(torch.bool)).to(DEVICE)
         out = model.decode(ys, memory, tgt_mask)
         out = out.transpose(0, 1)
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.item()
 
-        ys = torch.cat([ys,
-                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
-        if next_word == EOS_IDX:
+        ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
+        if next_word == FINISH_IDX:
             break
     return ys
 
@@ -317,23 +343,32 @@ def translate(model: torch.nn.Module, src_sentence: str):
     src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
     num_tokens = src.shape[0]
     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-    tgt_tokens = greedy_decode(
-        model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX).flatten()
-    return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
+    print(vocab_transform[TGT_LANGUAGE].get_itos())
+    tgt_tokens = greedy_decode(model,  src, src_mask, max_len=num_tokens + 5, start_symbol=START_IDX).flatten()
+    return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<start>", "").replace("<finish>", "")
+    
+NUM_EPOCHS = 30
+print("fit start...")
+for epoch in range(1, NUM_EPOCHS+1):
+    start_time = timer()
+    train_loss = train_epoch(transformer, optimizer)
+    end_time = timer()
+    val_loss = evaluate(transformer)
+    print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
-test = "T R V K L N Y L D Q I A K F W E I Q G S S L K I P N V E R R I L D L Y S L S K I V V E E G G Y E A I C K D R R W A R V A Q R L N Y P P G K N I G S L L R S H Y E R I V Y P Y E M Y Q S G"
-print(translate(transformer, test))
+test_data = 'A B A B A B B B B B'
+print(translate(transformer, test_data))
 
-TEST_RESULT = './DATA/logs.csv'
-result = []
-for test in TEST_DATA:
-    input_data = test[0]
-    predicted_result = translate(transformer, input_data)
-    answer = test[1]
-    result.append({'input_data': input_data, 'predict': predicted_result, 'answer': answer})
+# TEST_RESULT = './DATA/logs.csv'
+# result = []
+# for test in TEST_DATA:
+#     input_data = test[0]
+#     predicted_result = translate(transformer, input_data)
+#     answer = test[1]
+#     result.append({'input_data': input_data, 'predict': predicted_result, 'answer': answer})
 
-with open(TEST_RESULT, "w", newline="") as f:
-    fieldnames = ["input_data", "predict", "answer"]
-    dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-    dic_writer.writeheader()
-    dic_writer.writerows(result)
+# with open(TEST_RESULT, "w", newline="") as f:
+#     fieldnames = ["input_data", "predict", "answer"]
+#     dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+#     dic_writer.writeheader()
+#     dic_writer.writerows(result)
