@@ -136,14 +136,19 @@ class Seq2SeqTransformer(nn.Module):
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         return self.transformer.decoder(self.positional_encoding( self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
-# 出現度の逆数をとったLoss関数
-class MAELoss(nn.Module):
-    def __init__(self): 
-        super(MAELoss, self).__init__()
+import torch.nn.functional as F
+class FocalLoss(nn.modules.loss._WeightedLoss):
+    def __init__(self, weight=None, gamma=2,reduction='mean'):
+        super(FocalLoss, self).__init__(weight,reduction=reduction)
+        self.gamma = gamma
+        self.weight = weight # weight parameter will act as the alpha parameter to balance class weights
+    def forward(self, input, target):
+        ce_loss = F.cross_entropy(input, target,reduction=self.reduction,weight=self.weight)
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
+        return focal_loss
 
-    def forward(self, outputs, targets):
-        loss = torch.mean(torch.abs(outputs - targets))
-        return loss
+# 出現度の逆数をとったLoss関数
 
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones((sz, sz), device=DEVICE)) == 1).transpose(0, 1)
@@ -188,6 +193,7 @@ for p in transformer.parameters():
 transformer = transformer.to(DEVICE)
 
 loss_fn = torch.nn.CrossEntropyLoss(ignore_index=E_TER_IDX)
+focal_loss_fn = FocalLoss()
 
 optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
 
@@ -249,15 +255,17 @@ def train_epoch(model, optimizer):
 
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
+        # Seq2SeqTransformer.forwardを実行した場合
         logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
-        print("src:", src.shape)
-        print("tgt_input:", tgt_input.shape)
-        print("src_mask:", src_mask.shape)
-        print("tgt_mask:", tgt_mask.shape)
-        print("src_padding_mask:", src_padding_mask.shape)
-        print("tgt_padding_mask:", tgt_padding_mask.shape)
+        # print("src:", src.shape)
+        # print("tgt_input:", tgt_input.shape)
+        # print("src_mask:", src_mask.shape)
+        # print("tgt_mask:", tgt_mask.shape)
+        # print("src_padding_mask:", src_padding_mask.shape)
+        # print("tgt_padding_mask:", tgt_padding_mask.shape)
 
-        print("logits:", logits.shape)
+        # print("logits:", logits.shape)
+        # print(logits)
         optimizer.zero_grad()
 
         """
@@ -265,30 +273,15 @@ def train_epoch(model, optimizer):
         [A,B,C,D] => [B,C,D]
         """
         tgt_out = tgt[1:, :]
-        print(logits.reshape(-1, logits.shape[-1]).shape)
+        print("入力値1つ目のshape:", logits.reshape(-1, logits.shape[-1]).shape)
         print(logits.reshape(-1, logits.shape[-1]))
-        print(tgt_out.reshape(-1).shape)
-        print(tgt_out.reshape(-1))
-        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-        print(type(loss))
-        insert_loss = torch.tensor([
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0],
-            [0, 0, 2, 0, 0, 0]
-        ])
-        loss = insert_loss
+        print("入力値2つ目のshape:", tgt_out.reshape(-1).shape)
+
+        loss = focal_loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+
         loss.backward()
         optimizer.step()
         losses += loss.item()
-        print("lossesの最終値は:", losses)
 
     return losses / len(train_dataloader)
 
@@ -311,7 +304,9 @@ def evaluate(model):
         logits = model(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
 
         tgt_out = tgt[1:, :]
-        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        
+        loss = focal_loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
         losses += loss.item()
 
     return losses / len(val_dataloader)
