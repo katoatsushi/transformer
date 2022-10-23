@@ -1,6 +1,7 @@
 import requests
 import json
 import csv
+import time
 
 URL = 'https://cdn.rcsb.org/resources/sequence/clusters/clusters-by-entity-30.txt'
 PDB_ID_LIST = './pdb_ids.txt'
@@ -32,15 +33,20 @@ def n_length_array(num, kind):
         res.append("#")
     return res
 
-head_pdb_list = ['1YPZ_4', 'AF_AFP54666F1_1', '6O24_3', 'AF_AFF1QJ45F1_1', 'AF_AFA0A1R3UDR5F1_1', 'AF_AFQ3IPJ1F1_1', 'AF_AFQ9WYG0F1_1', 'AF_AFQ9MTJ0F1_1', '4IRU_2', 'AF_AFA9NHG9F1_1']
-# head_pdb_list = ['4IRU_2']
 PDB_API_ENDPOINT = "https://data.rcsb.org/rest/v1/core/"
 
 CSV_PATH = './data.csv'
 with open(CSV_PATH, 'w') as f:
     writer = csv.writer(f, lineterminator='\n')
 
-for pdb in head_pdb_list[:10]:
+failed_pdb = []
+counter = 0
+for pdb in pdbIdList:
+    if((counter != 0) and (counter % 5000 == 0)):
+        print("-------------------5分sleep-----------------")
+        time.sleep(300)
+
+    print(pdb, "............")
     res = {
         "amino_residues": [],
         "secondary_list": [],
@@ -57,6 +63,7 @@ for pdb in head_pdb_list[:10]:
     try:
         ("X-ray" in jsonData["rcsb_entry_info"]["experimental_method"]) and (jsonData["rcsb_entry_info"]["resolution_combined"][0] < 3)
     except:
+        failed_pdb.append(pdb)
         print("PDB_ID:", pdb, " で詳細情報取得失敗")
         continue
     # ChainIDを取得
@@ -73,30 +80,32 @@ for pdb in head_pdb_list[:10]:
 
     secondary_list = n_length_array(len(list(amino_residues)), "structure")
     asa_list = n_length_array(len(list(amino_residues)), "asa")
+    try:
+        for feature in jsonData["rcsb_polymer_instance_feature"]:
+            if(feature["name"] == "sheet"):
+                for feature_position in feature["feature_positions"]:
+                    beg_seq_id, end_seq_id = feature_position["beg_seq_id"], feature_position["end_seq_id"]
+                    for index in range(beg_seq_id - 1,end_seq_id):
+                        secondary_list[index] = "S"
+            elif(feature["name"] == "helix"):
+                for feature_position in feature["feature_positions"]:
+                    beg_seq_id, end_seq_id = feature_position["beg_seq_id"], feature_position["end_seq_id"]
+                    for index in range(beg_seq_id - 1,end_seq_id):
+                        secondary_list[index] = "S"
+            elif(feature["type"] == "ASA"):
+                for feature_position in feature["feature_positions"]:
+                    beg_seq_id, end_seq_id, values = feature_position["beg_seq_id"], feature_position["end_seq_id"], feature_position["values"]
+                    asa_list[beg_seq_id-1:end_seq_id] = [ str(round(value, 2)) for value in values ]
+    except:
+        failed_pdb.append(pdb)
+        print("PDB_ID:", pdb, " で詳細情報取得失敗")
+        continue
 
-    for feature in jsonData["rcsb_polymer_instance_feature"]:
-        if(feature["name"] == "sheet"):
-            for feature_position in feature["feature_positions"]:
-                beg_seq_id, end_seq_id = feature_position["beg_seq_id"], feature_position["end_seq_id"]
-                for index in range(beg_seq_id - 1,end_seq_id):
-                    secondary_list[index] = "S"
-        elif(feature["name"] == "helix"):
-            for feature_position in feature["feature_positions"]:
-                beg_seq_id, end_seq_id = feature_position["beg_seq_id"], feature_position["end_seq_id"]
-                for index in range(beg_seq_id - 1,end_seq_id):
-                    secondary_list[index] = "S"
-        elif(feature["type"] == "ASA"):
-            for feature_position in feature["feature_positions"]:
-                beg_seq_id, end_seq_id, values = feature_position["beg_seq_id"], feature_position["end_seq_id"], feature_position["values"]
-                asa_list[beg_seq_id-1:end_seq_id] = [ str(round(value, 2)) for value in values ]
-
-    # print(asa_list)
     res["amino_residues"] = ' '.join(list(amino_residues))
     res["secondary_list"] = ' '.join(secondary_list)
     res["asa_list"] = ' '.join(asa_list)
-    # print(res)
+
     print("元データ長さ:", len(list(amino_residues)))
-    print(res["secondary_list"])
     print("amino_residuesの長さは:", len(res["amino_residues"].split(' ')))
     print("secondary_listの長さは:", len(res["secondary_list"].split(' ')))
     print("asa_listの長さは:", len(res["asa_list"].split(' ')))
@@ -105,3 +114,11 @@ for pdb in head_pdb_list[:10]:
     with open(CSV_PATH, 'a') as f:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow([res["amino_residues"], res["secondary_list"], res["asa_list"]])
+    # 失敗したPDBを書き込み
+    f = open('./failed_pdb.txt', 'a', newline='\n')
+    f.close()
+    f = open('./failed_pdb.txt', 'w', newline='\n')
+    for pdb in failed_pdb:
+        f.write(pdb+'\n')
+    f.close()
+    counter += 1
