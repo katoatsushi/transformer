@@ -13,7 +13,6 @@ output_data_list = list(output_data_list)
 output_residues = [ ' '.join(i) for i in output_data_list ]
 
 WRITE_TO = './onestr_data.csv'
-
 with open(WRITE_TO, 'w') as f:
   writer = csv.writer(f)
   for acids, structure in zip(input_residues, output_residues):

@@ -17,17 +17,15 @@ TGT_LANGUAGE = 'structure'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # サンプル
-path = './DATA/sample.csv'
+path = './DATA/data.csv'
 # path = './DATA/onestr_data.csv'
 
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
 
-#TRAIN_DATA = train_rows[:10000]
-#TEST_DATA = train_rows[10000:]
-TRAIN_DATA = train_rows[:1]
-TEST_DATA = train_rows[:1]
+TRAIN_DATA = train_rows[:10000]
+TEST_DATA = train_rows[10000:]
 # Place-holders
 token_transform = {}
 vocab_transform = {}
@@ -367,3 +365,6 @@ print(translate(transformer, test_data))
 #     dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
 #     dic_writer.writeheader()
 #     dic_writer.writerows(result)
+
+
+# 1 => [1,1,1,11,1,33,3,10,8]
