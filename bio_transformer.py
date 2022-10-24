@@ -23,9 +23,10 @@ path = './DATA/data.csv'
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
-
-TRAIN_DATA = train_rows[:10000]
-TEST_DATA = train_rows[10000:]
+TRAIN_DATA = train_rows[:100]
+TEST_DATA = train_rows[100:116]
+# TRAIN_DATA = train_rows[:10000]
+# TEST_DATA = train_rows[10000:]
 # Place-holders
 token_transform = {}
 vocab_transform = {}
@@ -41,8 +42,6 @@ def yield_tokens(data_iter: Iterable, language: str) -> List[str]:
     for data_sample in data_iter:
         yield token_transform[language](data_sample[language_index[language]])
 
-# UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-#special_symbols = ['<unk>', '<pad>', '<bos>', '<eos>']
 # Define special symbols and indices
 C_TER_IDX, E_TER_IDX, START_IDX, FINISH_IDX = 0, 1, 2, 3
 # Make sure the tokens are in order of their indices to properly insert them in vocab
@@ -134,6 +133,7 @@ class Seq2SeqTransformer(nn.Module):
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         return self.transformer.decoder(self.positional_encoding( self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
+# 不均衡データ用のロス関数
 import torch.nn.functional as F
 class FocalLoss(nn.modules.loss._WeightedLoss):
     def __init__(self, weight=None, gamma=2,reduction='mean'):
@@ -170,7 +170,7 @@ SRC_VOCAB_SIZE = len(vocab_transform[SRC_LANGUAGE])
 TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
 EMB_SIZE = 32
 NHEAD = 4
-FFN_HID_DIM = 16
+FFN_HID_DIM = 32
 BATCH_SIZE = 1
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
@@ -191,6 +191,7 @@ for p in transformer.parameters():
 transformer = transformer.to(DEVICE)
 
 loss_fn = torch.nn.CrossEntropyLoss(ignore_index=E_TER_IDX)
+# 不均衡データ用のロス関数
 focal_loss_fn = FocalLoss()
 
 optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
@@ -271,9 +272,6 @@ def train_epoch(model, optimizer):
         [A,B,C,D] => [B,C,D]
         """
         tgt_out = tgt[1:, :]
-        print("入力値1つ目のshape:", logits.reshape(-1, logits.shape[-1]).shape)
-        print(logits.reshape(-1, logits.shape[-1]))
-        print("入力値2つ目のshape:", tgt_out.reshape(-1).shape)
 
         loss = focal_loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
 
