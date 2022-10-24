@@ -34,19 +34,31 @@ def n_length_array(num, kind):
     return res
 
 PDB_API_ENDPOINT = "https://data.rcsb.org/rest/v1/core/"
-
 CSV_PATH = './data.csv'
-with open(CSV_PATH, 'w') as f:
-    writer = csv.writer(f, lineterminator='\n')
+
+def reset_data_csv():
+    with open(CSV_PATH, 'w') as f:
+        writer = csv.writer(f, lineterminator='\n')
+
+def failed_pdb_csv():
+    f = open('./failed_pdb.txt', 'w', newline='\n')
+    f.close()
+
+# # data.csvをまっさらにする
+# reset_data_csv()
+# failed_pdb_csv()
+
+# "https://data.rcsb.org/rest/v1/core/polymer_entity/3T5V/2"
+# 3T5V_2 まではうまくいった　"23102行目" 12:41
+# 6BTM_3 まではうまくいった　"33382行目" 13:35
+# 1YRT_1 まではうまくいった　"33581行目" 13:56
+# 1WK2_1 64293
 
 failed_pdb = []
-counter = 0
-for pdb in pdbIdList:
-    if((counter != 0) and (counter % 5000 == 0)):
-        print("-------------------5分sleep-----------------")
-        time.sleep(300)
 
-    print(pdb, "............")
+# AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う
+for pdb in pdbIdList[63662:]:
+    print(pdb, "......................")
     res = {
         "amino_residues": [],
         "secondary_list": [],
@@ -55,6 +67,9 @@ for pdb in pdbIdList:
     items = pdb.split('_')
     entity_id = items[-1]
     entry_id = '_'.join(items[:len(items)-1])
+    if (items[0] == "AF"):
+        print("AlpheFoldによる構造決定は無視   PDBID ",pdb)
+        continue
     # X線構造解析かどうか？
     entry_url = PDB_API_ENDPOINT + "entry/" + entry_id
     response = requests.get(entry_url)
@@ -63,7 +78,7 @@ for pdb in pdbIdList:
     try:
         ("X-ray" in jsonData["rcsb_entry_info"]["experimental_method"]) and (jsonData["rcsb_entry_info"]["resolution_combined"][0] < 3)
     except:
-        failed_pdb.append(pdb)
+        # failed_pdb.append(pdb)
         print("PDB_ID:", pdb, " で詳細情報取得失敗")
         continue
     # ChainIDを取得
@@ -97,7 +112,7 @@ for pdb in pdbIdList:
                     beg_seq_id, end_seq_id, values = feature_position["beg_seq_id"], feature_position["end_seq_id"], feature_position["values"]
                     asa_list[beg_seq_id-1:end_seq_id] = [ str(round(value, 2)) for value in values ]
     except:
-        failed_pdb.append(pdb)
+        # failed_pdb.append(pdb)
         print("PDB_ID:", pdb, " で詳細情報取得失敗")
         continue
 
@@ -115,10 +130,9 @@ for pdb in pdbIdList:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow([res["amino_residues"], res["secondary_list"], res["asa_list"]])
     # 失敗したPDBを書き込み
-    f = open('./failed_pdb.txt', 'a', newline='\n')
+    f = open('./fetched_pdb.txt', 'a', newline='\n')
+    f.write(pdb+'\n')
     f.close()
-    f = open('./failed_pdb.txt', 'w', newline='\n')
-    for pdb in failed_pdb:
-        f.write(pdb+'\n')
-    f.close()
-    counter += 1
+    # f = open('./failed_pdb.txt', 'a', newline='\n')
+    # f.write(pdb+'\n')
+    # f.close()
