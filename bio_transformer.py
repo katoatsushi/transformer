@@ -23,8 +23,9 @@ path = './DATA/data.csv'
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
-TRAIN_DATA = train_rows[:100]
-TEST_DATA = train_rows[100:116]
+train_rows = [ [rows[0], rows[1]] for rows in train_rows]
+TRAIN_DATA = train_rows[:2000]
+TEST_DATA = train_rows[2000:]
 # TRAIN_DATA = train_rows[:10000]
 # TEST_DATA = train_rows[10000:]
 # Place-holders
@@ -168,10 +169,11 @@ torch.manual_seed(0)
 
 SRC_VOCAB_SIZE = len(vocab_transform[SRC_LANGUAGE])
 TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
-EMB_SIZE = 32
+
+EMB_SIZE = 64
 NHEAD = 4
-FFN_HID_DIM = 32
-BATCH_SIZE = 1
+FFN_HID_DIM = 64
+BATCH_SIZE = 8
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
 
@@ -223,7 +225,6 @@ def collate_fn(batch):
     for src_sample, tgt_sample in batch:
         src_batch.append(text_transform[SRC_LANGUAGE](src_sample.rstrip("\n")))
         tgt_batch.append(text_transform[TGT_LANGUAGE](tgt_sample.rstrip("\n")))
-
     src_batch = pad_sequence(src_batch, padding_value=E_TER_IDX)
     tgt_batch = pad_sequence(tgt_batch, padding_value=E_TER_IDX)
     return src_batch, tgt_batch
@@ -347,22 +348,19 @@ for epoch in range(1, NUM_EPOCHS+1):
     val_loss = evaluate(transformer)
     print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
-test_data = 'A B A B A B B B B B'
-print(translate(transformer, test_data))
-
-# TEST_RESULT = './DATA/logs.csv'
-# result = []
-# for test in TEST_DATA:
-#     input_data = test[0]
-#     predicted_result = translate(transformer, input_data)
-#     answer = test[1]
-#     result.append({'input_data': input_data, 'predict': predicted_result, 'answer': answer})
-
-# with open(TEST_RESULT, "w", newline="") as f:
-#     fieldnames = ["input_data", "predict", "answer"]
-#     dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-#     dic_writer.writeheader()
-#     dic_writer.writerows(result)
+# テスト結果を書き込む
+TEST_RESULT = './DATA/logs.csv'
+result = []
+for test in TEST_DATA:
+    input_data = test[0]
+    predicted_result = translate(transformer, input_data)
+    answer = test[1]
+    result.append({'input_data': input_data, 'predict': predicted_result, 'answer': answer})
+with open(TEST_RESULT, "w", newline="") as f:
+    fieldnames = ["input_data", "predict", "answer"]
+    dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+    dic_writer.writeheader()
+    dic_writer.writerows(result)
 
 
 # 1 => [1,1,1,11,1,33,3,10,8]

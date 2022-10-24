@@ -48,12 +48,12 @@ def reset_data_csv():
 # 3T5V_2 まではうまくいった　"23102行目" 12:41
 # 6BTM_3 まではうまくいった　"33382行目" 13:35
 # 1YRT_1 まではうまくいった　"33581行目" 13:56
-# 7F9I_1 69149
+# 5TCQ_1 10562
 
 failed_pdb = []
 
 # AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う
-for pdb in pdbIdList[69149:]:
+for pdb in pdbIdList[10562:]:
     print(pdb, "......................")
     res = {
         "amino_residues": [],
@@ -102,7 +102,7 @@ for pdb in pdbIdList[69149:]:
                 for feature_position in feature["feature_positions"]:
                     beg_seq_id, end_seq_id = feature_position["beg_seq_id"], feature_position["end_seq_id"]
                     for index in range(beg_seq_id - 1,end_seq_id):
-                        secondary_list[index] = "S"
+                        secondary_list[index] = "H"
             elif(feature["type"] == "ASA"):
                 for feature_position in feature["feature_positions"]:
                     beg_seq_id, end_seq_id, values = feature_position["beg_seq_id"], feature_position["end_seq_id"], feature_position["values"]
