@@ -34,15 +34,11 @@ def n_length_array(num, kind):
     return res
 
 PDB_API_ENDPOINT = "https://data.rcsb.org/rest/v1/core/"
-CSV_PATH = './data.csv'
+CSV_PATH = '../data.csv'
 
 def reset_data_csv():
     with open(CSV_PATH, 'w') as f:
         writer = csv.writer(f, lineterminator='\n')
-
-def failed_pdb_csv():
-    f = open('./failed_pdb.txt', 'w', newline='\n')
-    f.close()
 
 # # data.csvをまっさらにする
 # reset_data_csv()
@@ -52,12 +48,12 @@ def failed_pdb_csv():
 # 3T5V_2 まではうまくいった　"23102行目" 12:41
 # 6BTM_3 まではうまくいった　"33382行目" 13:35
 # 1YRT_1 まではうまくいった　"33581行目" 13:56
-# 1WK2_1 64293
+# 7F9I_1 69149
 
 failed_pdb = []
 
 # AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う
-for pdb in pdbIdList[63662:]:
+for pdb in pdbIdList[69149:]:
     print(pdb, "......................")
     res = {
         "amino_residues": [],
@@ -130,7 +126,7 @@ for pdb in pdbIdList[63662:]:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow([res["amino_residues"], res["secondary_list"], res["asa_list"]])
     # 失敗したPDBを書き込み
-    f = open('./fetched_pdb.txt', 'a', newline='\n')
+    f = open('../fetched_pdb.txt', 'a', newline='\n')
     f.write(pdb+'\n')
     f.close()
     # f = open('./failed_pdb.txt', 'a', newline='\n')
