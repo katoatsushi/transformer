@@ -339,7 +339,7 @@ def translate(model: torch.nn.Module, src_sentence: str):
     tgt_tokens = greedy_decode(model,  src, src_mask, max_len=num_tokens + 5, start_symbol=START_IDX).flatten()
     return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<start>", "").replace("<finish>", "")
     
-NUM_EPOCHS = 30
+NUM_EPOCHS = 100
 print("fit start...")
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()
