@@ -48,12 +48,12 @@ def reset_data_csv():
 # 3T5V_2 まではうまくいった　"23102行目" 12:41
 # 6BTM_3 まではうまくいった　"33382行目" 13:35
 # 1YRT_1 まではうまくいった　"33581行目" 13:56
-# 5TCQ_1 10562
+# 7K04_1 28858
 
 failed_pdb = []
 
 # AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う
-for pdb in pdbIdList[10562:]:
+for pdb in pdbIdList[28858:]:
     print(pdb, "......................")
     res = {
         "amino_residues": [],

@@ -16,6 +16,8 @@ SRC_LANGUAGE = 'amino'
 TGT_LANGUAGE = 'structure'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# torch.cuda.empty_cache() 
+
 # サンプル
 path = './DATA/data.csv'
 # path = './DATA/onestr_data.csv'
@@ -172,7 +174,7 @@ TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
 
 EMB_SIZE = 64
 NHEAD = 4
-FFN_HID_DIM = 64
+FFN_HID_DIM = 32
 BATCH_SIZE = 8
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
@@ -361,6 +363,3 @@ with open(TEST_RESULT, "w", newline="") as f:
     dic_writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
     dic_writer.writeheader()
     dic_writer.writerows(result)
-
-
-# 1 => [1,1,1,11,1,33,3,10,8]
