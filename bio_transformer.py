@@ -16,20 +16,18 @@ SRC_LANGUAGE = 'amino'
 TGT_LANGUAGE = 'structure'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# torch.cuda.empty_cache() 
+torch.cuda.empty_cache() 
 
 # サンプル
-path = './DATA/data.csv'
-# path = './DATA/onestr_data.csv'
+# path = './DATA/data.csv'
+path = './DATA/without_asa_data.csv'
 
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
-train_rows = [ [rows[0], rows[1]] for rows in train_rows]
-TRAIN_DATA = train_rows[:2000]
-TEST_DATA = train_rows[2000:]
-# TRAIN_DATA = train_rows[:10000]
-# TEST_DATA = train_rows[10000:]
+TRAIN_DATA = train_rows[:5000]
+TEST_DATA = train_rows[5000:]
+
 # Place-holders
 token_transform = {}
 vocab_transform = {}
@@ -175,7 +173,7 @@ TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
 EMB_SIZE = 64
 NHEAD = 4
 FFN_HID_DIM = 32
-BATCH_SIZE = 8
+BATCH_SIZE = 2
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
 
