@@ -6,6 +6,14 @@ import time
 URL = 'https://cdn.rcsb.org/resources/sequence/clusters/clusters-by-entity-30.txt'
 PDB_ID_LIST = './pdb_ids.txt'
 
+"""
+ASAの部分の情報が少数の配列のみのはずなのに、"#"が入っている。
+
+29: 1BWV_1
+35: 5CG0_1
+51: 1GG2_3
+"""
+
 # response = requests.get(URL)
 # response_body = response.text.split('\n') # 338113行あった
 # # 各行の頭だけを持ってくる
@@ -47,7 +55,7 @@ def reset_data_csv():
 # "https://data.rcsb.org/rest/v1/core/polymer_entity/3T5V/2"
 # 3E90_1 84446
 
-pdb_id, raw_num = '3E90_1', 84446
+pdb_id, raw_num = '6VY7_1', 113719
 failed_pdb = []
 
 # AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う

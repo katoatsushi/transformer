@@ -20,13 +20,13 @@ torch.cuda.empty_cache()
 
 # サンプル
 # path = './DATA/data.csv'
-path = './DATA/without_asa_data.csv'
+path = './DATA/equality_data.csv'
 
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
-TRAIN_DATA = train_rows[:5]
-TEST_DATA = train_rows[5:7]
+TRAIN_DATA = train_rows[:2000]
+TEST_DATA = train_rows[2000:] # 36件しかない
 
 # Place-holders
 token_transform = {}
@@ -137,7 +137,7 @@ class Seq2SeqTransformer(nn.Module):
 # 不均衡データ用のロス関数
 import torch.nn.functional as F
 class FocalLoss(nn.modules.loss._WeightedLoss):
-    def __init__(self, weight=None, gamma=2,reduction='mean'):
+    def __init__(self, weight=None, gamma=1,reduction='mean'):
         super(FocalLoss, self).__init__(weight,reduction=reduction)
         self.gamma = gamma
         self.weight = weight # weight parameter will act as the alpha parameter to balance class weights
@@ -146,8 +146,6 @@ class FocalLoss(nn.modules.loss._WeightedLoss):
         pt = torch.exp(-ce_loss)
         focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
         return focal_loss
-
-# 出現度の逆数をとったLoss関数
 
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones((sz, sz), device=DEVICE)) == 1).transpose(0, 1)
@@ -172,7 +170,7 @@ TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
 
 EMB_SIZE = 64
 NHEAD = 4
-FFN_HID_DIM = 32
+FFN_HID_DIM = 64
 BATCH_SIZE = 1
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
