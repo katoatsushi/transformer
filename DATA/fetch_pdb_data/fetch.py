@@ -45,15 +45,13 @@ def reset_data_csv():
 # failed_pdb_csv()
 
 # "https://data.rcsb.org/rest/v1/core/polymer_entity/3T5V/2"
-# 3T5V_2 まではうまくいった　"23102行目" 12:41
-# 6BTM_3 まではうまくいった　"33382行目" 13:35
-# 1YRT_1 まではうまくいった　"33581行目" 13:56
-# 7K04_1 28858
+# 3E90_1 84446
 
+pdb_id, raw_num = '3E90_1', 84446
 failed_pdb = []
 
 # AF_AFP46308F1_1が10行目だった場合　pdbIdList[9:] で行う
-for pdb in pdbIdList[28858:]:
+for pdb in pdbIdList[raw_num:]:
     print(pdb, "......................")
     res = {
         "amino_residues": [],
