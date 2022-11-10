@@ -20,13 +20,13 @@ torch.cuda.empty_cache()
 
 # サンプル
 # path = './DATA/data.csv'
-path = './DATA/equality_data.csv'
+path = './test_data.csv'
 
 f = open(path,'r',encoding="utf-8")
 train_rows = csv.reader(f)
 train_rows = list(train_rows)
-TRAIN_DATA = train_rows[:2000]
-TEST_DATA = train_rows[2000:] # 36件しかない
+TRAIN_DATA = train_rows[:10000]
+TEST_DATA = train_rows[10000:] # 2000件しかない
 
 # Place-holders
 token_transform = {}
@@ -168,9 +168,9 @@ torch.manual_seed(0)
 SRC_VOCAB_SIZE = len(vocab_transform[SRC_LANGUAGE])
 TGT_VOCAB_SIZE = len(vocab_transform[TGT_LANGUAGE])
 
-EMB_SIZE = 64
+EMB_SIZE = 16
 NHEAD = 4
-FFN_HID_DIM = 64
+FFN_HID_DIM = 16
 BATCH_SIZE = 1
 NUM_ENCODER_LAYERS = 4
 NUM_DECODER_LAYERS = 4
@@ -333,11 +333,11 @@ def translate(model: torch.nn.Module, src_sentence: str):
     src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
     num_tokens = src.shape[0]
     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-    print(vocab_transform[TGT_LANGUAGE].get_itos())
+    # print(vocab_transform[TGT_LANGUAGE].get_itos())
     tgt_tokens = greedy_decode(model,  src, src_mask, max_len=num_tokens + 5, start_symbol=START_IDX).flatten()
     return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<start>", "").replace("<finish>", "")
     
-NUM_EPOCHS = 50
+NUM_EPOCHS = 30
 print("fit start...")
 for epoch in range(1, NUM_EPOCHS+1):
     start_time = timer()
